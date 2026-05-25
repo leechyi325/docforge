@@ -1,0 +1,20 @@
+[project]
+name = "docforge"
+version = "0.1.0"
+description = "Desktop document formatting MVP"
+requires-python = ">=3.11"
+dependencies = [
+  "openai>=1.0.0",
+  "pydantic>=2.7.0",
+  "python-docx>=1.1.0",
+  "PyYAML>=6.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

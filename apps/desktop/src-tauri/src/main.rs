@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::path::Path;
 use std::process::Command;
 
 #[derive(Debug, Deserialize)]
@@ -53,7 +54,7 @@ fn run_engine(python: &str, request: &GenerateRequest) -> Result<String, String>
             "--output",
             &request.output_path,
         ])
-        .current_dir("../../")
+        .current_dir(repo_root())
         .output()
         .map_err(|error| error.to_string())?;
 
@@ -62,6 +63,14 @@ fn run_engine(python: &str, request: &GenerateRequest) -> Result<String, String>
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+fn repo_root() -> &'static Path {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .expect("src-tauri should live under apps/desktop/src-tauri")
 }
 
 fn main() {

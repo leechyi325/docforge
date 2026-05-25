@@ -1,0 +1,47 @@
+id: meeting_minutes
+name: 会议纪要
+required_fields:
+  - title
+  - meeting_time
+  - meeting_location
+  - attendees
+page:
+  paper: A4
+  margin_top: 2.54cm
+  margin_bottom: 2.54cm
+  margin_left: 3.18cm
+  margin_right: 3.18cm
+title:
+  font: 黑体
+  size: 二号
+  bold: true
+  align: center
+  line_spacing: 28pt
+body:
+  font: 仿宋
+  size: 三号
+  align: justify
+  first_line_indent: 2em
+  line_spacing: 28pt
+  space_before: 0pt
+  space_after: 0pt
+headings:
+  heading_1:
+    font: 黑体
+    size: 三号
+    bold: true
+    align: left
+    line_spacing: 28pt
+special_sections:
+  meeting_meta:
+    font: 仿宋
+    size: 三号
+    align: left
+    line_spacing: 28pt
+auto_fix_rules:
+  - title_style
+  - body_style
+  - heading_style
+  - page_setup
+  - required_fields
+template: null

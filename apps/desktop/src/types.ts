@@ -11,3 +11,17 @@ export type Issue = {
   };
   fix_action: unknown | null;
 };
+
+export type GenerateRequest = {
+  inputPath: string;
+  outputPath: string;
+  profile: ProfileId;
+  formatInstruction: string;
+  llmProvider: "local" | "openai";
+  apiKey: string;
+};
+
+export type GenerateResponse = {
+  output: string;
+  issues: Issue[];
+};

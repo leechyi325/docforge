@@ -1,4 +1,4 @@
-# 文档格式智能整理桌面软件设计
+# DocForge 文档格式智能整理桌面软件设计
 
 日期：2026-05-25
 
@@ -27,9 +27,9 @@
 ```text
 导入 Markdown
   ↓
-选择文档类型 profile
+选择文档类型 profile（默认为通用格式文档）
   ↓
-填写临时格式指令
+填写临时格式指令（可选）
   ↓
 OpenAI API 解析文档结构与临时格式要求
   ↓
@@ -59,7 +59,7 @@ OpenAI 调用使用 Responses API 和 Structured Outputs。模型只负责结构
 ## 项目结构
 
 ```text
-docFormat/
+docforge/
 ├─ apps/
 │  └─ desktop/
 │     ├─ src/

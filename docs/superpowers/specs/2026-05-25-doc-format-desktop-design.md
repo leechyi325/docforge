@@ -18,6 +18,7 @@
 - 会议纪要
 - 汇报材料
 - 讲话稿
+- 通用格式文档
 
 第一版聚焦格式处理，不做内容润色，不做 Word/WPS 插件，不支持 `.doc` 老格式。
 
@@ -76,7 +77,8 @@ docFormat/
 │  │  ├─ official.yaml
 │  │  ├─ meeting_minutes.yaml
 │  │  ├─ briefing.yaml
-│  │  └─ speech.yaml
+│  │  ├─ speech.yaml
+│  │  └─ general.yaml
 │  ├─ templates/
 │  ├─ formatter/
 │  │  └─ docx_formatter.py
@@ -109,6 +111,8 @@ profile 至少包含：
 ```text
 系统默认规则 < 文档 profile < 用户临时格式指令
 ```
+
+通用格式文档是轻量 profile，用于只需要控制基础版式的材料。它不要求复杂文档结构，只关注主标题、段落标题、正文字体字号、段落缩进、行距和段前段后。该 profile 适合临时材料、内部说明、一般通知、简单报告等格式要求较少的文件。
 
 ## 临时格式指令
 
@@ -241,6 +245,7 @@ python -m engine.cli fix --input output.docx --issues issues.json --output fixed
 
 - Markdown 导入
 - 文档类型选择
+- 通用格式文档 profile
 - 临时格式指令输入
 - OpenAI 结构化解析
 - Pandoc 基础转换
@@ -296,10 +301,10 @@ Pandoc 输出格式不满足公文要求。对策是把 Pandoc 定位为基础�
 
 Windows 打包复杂。对策是第一版先让核心引擎 CLI 化，桌面端只负责调用；后续再处理 Python、Pandoc 和模板资源的打包策略。
 
-文档格式规则差异大。对策是 profile 化，把公文、会议纪要、汇报材料、讲话稿拆成独立配置，避免把规则写死在代码里。
+文档格式规则差异大。对策是 profile 化，把公文、会议纪要、汇报材料、讲话稿、通用格式文档拆成独立配置，避免把规则写死在代码里。
 
 ## 通过标准
 
-第一版完成时，用户应能在 macOS 上启动桌面软件，选择一份 Markdown，选择公文或会议纪要等 profile，输入临时格式指令，生成 `.docx`，看到格式诊断问题，并能对支持的问题执行单项修复或全部修复。
+第一版完成时，用户应能在 macOS 上启动桌面软件，选择一份 Markdown，选择公文、会议纪要或通用格式文档等 profile，输入临时格式指令，生成 `.docx`，看到格式诊断问题，并能对支持的问题执行单项修复或全部修复。
 
 生成的 `.docx` 应能被 Word/WPS 打开，正文、标题、行距、页边距等基础格式应符合 profile 与临时格式指令的合并结果。

@@ -11,6 +11,39 @@ const profiles: Array<{ id: ProfileId; label: string }> = [
   { id: "speech", label: "讲话稿" },
 ];
 
+const missingTauriRuntimeMessage = "当前页面没有连接到 Tauri 桌面运行时。请使用 `cd apps/desktop && npm run tauri dev` 启动，或打开打包后的 DocForge 应用。";
+
+type TauriWindow = Window &
+  typeof globalThis & {
+    __TAURI_INTERNALS__?: {
+      invoke?: unknown;
+    };
+  };
+
+function isTauriInvokeAvailable() {
+  return typeof (window as TauriWindow).__TAURI_INTERNALS__?.invoke === "function";
+}
+
+function getErrorMessage(error: unknown) {
+  if (typeof error === "string") {
+    if (error.includes("Cannot read properties of undefined") && error.includes("invoke")) {
+      return missingTauriRuntimeMessage;
+    }
+
+    return error.trim() || "处理失败，请检查输入路径、Python 环境或模型配置。";
+  }
+
+  if (error instanceof Error) {
+    if (error.message.includes("Cannot read properties of undefined") && error.message.includes("invoke")) {
+      return missingTauriRuntimeMessage;
+    }
+
+    return error.message;
+  }
+
+  return "处理失败，请检查输入路径、Python 环境或模型配置。";
+}
+
 export function App() {
   const [inputPath, setInputPath] = useState("");
   const [outputPath, setOutputPath] = useState("");
@@ -25,12 +58,22 @@ export function App() {
 
   async function handleGenerate() {
     setStatus(inputPath.trim().toLowerCase().endsWith(".docx") ? "正在整理 docx 格式" : "正在转换并整理 docx");
-    const result = await invoke<{ stdout: string }>("generate_docx", {
-      request: { inputPath, outputPath, profile, formatInstruction, llmProvider, llmModel, llmBaseUrl, apiKey },
-    });
-    const payload = JSON.parse(result.stdout) as GenerateResponse;
-    setIssues(payload.issues);
-    setStatus(`已生成：${payload.output}`);
+    setIssues([]);
+
+    try {
+      if (!isTauriInvokeAvailable()) {
+        throw new Error(missingTauriRuntimeMessage);
+      }
+
+      const result = await invoke<{ stdout: string }>("generate_docx", {
+        request: { inputPath, outputPath, profile, formatInstruction, llmProvider, llmModel, llmBaseUrl, apiKey },
+      });
+      const payload = JSON.parse(result.stdout) as GenerateResponse;
+      setIssues(payload.issues);
+      setStatus(`已生成：${payload.output}`);
+    } catch (error) {
+      setStatus(`处理失败：${getErrorMessage(error)}`);
+    }
   }
 
   return (

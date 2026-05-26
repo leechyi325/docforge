@@ -20,7 +20,7 @@ class OpenAIResponsesClient:
 
         from openai import OpenAI
 
-        kwargs = {"api_key": settings.api_key_or_env()}
+        kwargs = {"api_key": settings.api_key_or_env(), "timeout": 60.0}
         base_url = settings.base_url_or_env()
         if base_url:
             kwargs["base_url"] = base_url

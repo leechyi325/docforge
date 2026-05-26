@@ -1,4 +1,5 @@
 import pytest
+import openai
 
 from engine.llm.anthropic_messages import AnthropicMessagesClient
 from engine.llm.openai_responses import OpenAIResponsesClient
@@ -38,6 +39,21 @@ def test_openai_responses_adapter_uses_json_schema():
     assert override.title.font == "方正小标宋"
     assert fake_client.responses.kwargs["model"] == "gpt-test"
     assert fake_client.responses.kwargs["text"]["format"]["type"] == "json_schema"
+
+
+def test_openai_responses_adapter_sets_client_timeout(monkeypatch):
+    calls = []
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            calls.append(kwargs)
+            self.responses = FakeResponses()
+
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+
+    OpenAIResponsesClient(LlmSettings(provider="openai-responses", api_key="test", model="gpt-test"))
+
+    assert calls[0]["timeout"] == 60.0
 
 
 class FakeChatCompletions:
@@ -84,6 +100,21 @@ def test_openai_compatible_adapter_uses_chat_completions():
     assert override.body.font == "仿宋"
     assert fake_client.chat.completions.calls[0]["model"] == "deepseek-chat"
     assert fake_client.chat.completions.calls[0]["response_format"]["type"] == "json_schema"
+
+
+def test_openai_compatible_adapter_sets_client_timeout(monkeypatch):
+    calls = []
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            calls.append(kwargs)
+            self.chat = FakeChat()
+
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+
+    OpenAICompatibleClient(LlmSettings(provider="openai-compatible", api_key="test", model="deepseek-chat"))
+
+    assert calls[0]["timeout"] == 60.0
 
 
 class FakeRejectingChatCompletions:

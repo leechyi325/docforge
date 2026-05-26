@@ -1,4 +1,5 @@
-from engine.llm.client import parse_format_instruction_locally
+from engine.llm.client import create_llm_client, parse_format_instruction_locally
+from engine.llm.settings import LlmSettings
 
 
 def test_local_format_instruction_parser_handles_common_request():
@@ -13,3 +14,12 @@ def test_local_format_instruction_parser_handles_common_request():
     assert override.body.size == "三号"
     assert override.body.line_spacing == "28pt"
     assert override.headings["heading_1"].font == "黑体"
+
+
+def test_local_parser_is_available_through_client_factory():
+    client = create_llm_client(LlmSettings(provider="local"))
+
+    override = client.parse_format_instruction("正文仿宋三号，行距固定28磅")
+
+    assert override.body.font == "仿宋"
+    assert override.body.line_spacing == "28pt"

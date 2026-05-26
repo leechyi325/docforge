@@ -25,10 +25,11 @@ The project name is DocForge. Keep that name in user-facing docs and package/app
 Implemented MVP capabilities:
 
 - Markdown input.
+- Direct `.docx` input formatting through the Python CLI `format` command.
 - Profile selection.
 - Temporary natural-language format instructions.
 - Local deterministic fallback for instruction parsing and tests.
-- Optional OpenAI-backed parsing through the Python engine.
+- Optional OpenAI Responses, OpenAI-compatible Chat Completions, and Anthropic Messages provider adapters for format instruction parsing through the Python engine.
 - Pandoc conversion from Markdown to `.docx`.
 - Deterministic `.docx` post-formatting with `python-docx`.
 - Format diagnosis.
@@ -49,12 +50,12 @@ Python is the source of truth. The desktop app should stay a thin local UI that 
 
 Key areas:
 
-- `engine/cli.py`: CLI entry point for `generate`, `diagnose`, and `fix`.
+- `engine/cli.py`: CLI entry point for `format`, `generate`, `diagnose`, and `fix`.
 - `engine/models.py`: typed domain models for profiles, styles, issues, and fix actions.
 - `engine/style_utils.py`: Chinese font size conversion, unit parsing, and style merge helpers.
 - `engine/profiles/*.yaml`: built-in document profile definitions.
 - `engine/profiles/loader.py`: profile loading and validation.
-- `engine/llm/client.py`: OpenAI adapter and local deterministic fallback.
+- `engine/llm/client.py`: LLM provider dispatch and local deterministic fallback.
 - `engine/llm/prompts.py`: prompts for structure recognition, format instruction parsing, and diagnosis.
 - `engine/llm/schemas.py`: JSON schemas and validation boundaries for model outputs.
 - `engine/converters/pandoc.py`: Pandoc wrapper.
@@ -94,7 +95,18 @@ Use local deterministic parsing for normal tests:
   --output /tmp/docforge-general.docx
 ```
 
-Use OpenAI only when needed:
+Use `format` for the preferred general entry point, including direct `.docx` formatting:
+
+```bash
+.venv/bin/python -m engine.cli format \
+  --input input.docx \
+  --profile official \
+  --format-instruction "正文仿宋三号，行距28磅" \
+  --llm-provider local \
+  --output output.docx
+```
+
+Use API-backed providers only when needed:
 
 ```bash
 .venv/bin/python -m engine.cli generate \
@@ -134,7 +146,7 @@ export DOCFORGE_PYTHON="$(pwd)/../../.venv/bin/python"
 npm run tauri dev
 ```
 
-Do not duplicate formatting business logic in React or Rust unless there is a strong reason. Keep formatting, diagnosis, and fixing inside the Python engine.
+Do not duplicate formatting business logic in React or Rust unless there is a strong reason. Keep formatting, diagnosis, and fixing inside the Python engine. The desktop should pass provider, model, and base URL settings through to the CLI rather than reimplementing provider behavior. API keys collected by the desktop should be passed to the child process through provider environment variables, not CLI argv.
 
 ## Development Setup
 
@@ -186,6 +198,13 @@ For Pandoc conversion behavior, run the relevant tests only when Pandoc is insta
 Known verification state after the MVP merge:
 
 - Python test suite: 14 passed.
+- Frontend build: passed.
+- Pandoc e2e: passed when Pandoc was available.
+- Rust/Tauri compile check was not run because `cargo` was not installed in the environment.
+
+Known verification state after the second-round implementation:
+
+- Python test suite: 43 passed.
 - Frontend build: passed.
 - Pandoc e2e: passed when Pandoc was available.
 - Rust/Tauri compile check was not run because `cargo` was not installed in the environment.

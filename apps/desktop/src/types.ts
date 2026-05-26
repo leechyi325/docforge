@@ -1,5 +1,7 @@
 export type ProfileId = "general" | "official" | "meeting_minutes" | "briefing" | "speech";
 
+export type LlmProvider = "local" | "openai-responses" | "openai-compatible" | "anthropic-messages";
+
 export type Issue = {
   id: string;
   severity: "info" | "warning" | "error";
@@ -17,7 +19,9 @@ export type GenerateRequest = {
   outputPath: string;
   profile: ProfileId;
   formatInstruction: string;
-  llmProvider: "local" | "openai";
+  llmProvider: LlmProvider;
+  llmModel: string;
+  llmBaseUrl: string;
   apiKey: string;
 };
 

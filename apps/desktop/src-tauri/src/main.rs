@@ -11,6 +11,8 @@ struct GenerateRequest {
     profile: String,
     format_instruction: String,
     llm_provider: String,
+    llm_model: String,
+    llm_base_url: String,
     api_key: String,
 }
 
@@ -36,11 +38,12 @@ fn generate_docx(request: GenerateRequest) -> Result<EngineResult, String> {
 }
 
 fn run_engine(python: &str, request: &GenerateRequest) -> Result<String, String> {
-    let output = Command::new(python)
+    let mut command = Command::new(python);
+    command
         .args([
             "-m",
             "engine.cli",
-            "generate",
+            "format",
             "--input",
             &request.input_path,
             "--profile",
@@ -49,14 +52,25 @@ fn run_engine(python: &str, request: &GenerateRequest) -> Result<String, String>
             &request.format_instruction,
             "--llm-provider",
             &request.llm_provider,
-            "--api-key",
-            &request.api_key,
+            "--llm-model",
+            &request.llm_model,
+            "--llm-base-url",
+            &request.llm_base_url,
             "--output",
             &request.output_path,
         ])
-        .current_dir(repo_root())
-        .output()
-        .map_err(|error| error.to_string())?;
+        .current_dir(repo_root());
+
+    if !request.api_key.trim().is_empty() {
+        let env_key = if request.llm_provider == "anthropic-messages" {
+            "ANTHROPIC_API_KEY"
+        } else {
+            "OPENAI_API_KEY"
+        };
+        command.env(env_key, &request.api_key);
+    }
+
+    let output = command.output().map_err(|error| error.to_string())?;
 
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).to_string());

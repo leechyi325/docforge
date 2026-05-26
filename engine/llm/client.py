@@ -1,40 +1,23 @@
 from __future__ import annotations
 
-import json
-import os
 import re
 from typing import Dict, List, Optional
 
-from engine.llm.prompts import FORMAT_INSTRUCTION_PROMPT
-from engine.llm.schemas import FORMAT_OVERRIDE_SCHEMA
+from engine.llm.base import LlmClient
+from engine.llm.settings import LlmSettings
 from engine.models import FormatOverride, ParagraphStyle
 
 
 class OpenAIClient:
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4.1-mini") -> None:
-        from openai import OpenAI
+        from engine.llm.openai_responses import OpenAIResponsesClient
 
-        self.model = model
-        self.client = OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
+        self._client = OpenAIResponsesClient(
+            LlmSettings(provider="openai-responses", api_key=api_key, model=model)
+        )
 
     def parse_format_instruction(self, instruction: str) -> FormatOverride:
-        response = self.client.responses.create(
-            model=self.model,
-            input=[
-                {"role": "system", "content": FORMAT_INSTRUCTION_PROMPT},
-                {"role": "user", "content": instruction},
-            ],
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "format_override",
-                    "schema": FORMAT_OVERRIDE_SCHEMA,
-                    "strict": True,
-                }
-            },
-        )
-        raw_text = response.output_text
-        return FormatOverride.model_validate(json.loads(raw_text))
+        return self._client.parse_format_instruction(instruction)
 
 
 def parse_format_instruction_locally(instruction: str) -> FormatOverride:
@@ -63,6 +46,30 @@ def parse_format_instruction_locally(instruction: str) -> FormatOverride:
         )
 
     return FormatOverride(title=title, body=body, headings=headings)
+
+
+class LocalLlmClient:
+    def parse_format_instruction(self, instruction: str) -> FormatOverride:
+        return parse_format_instruction_locally(instruction)
+
+
+def create_llm_client(settings: LlmSettings) -> LlmClient:
+    provider = settings.normalized_provider
+    if provider == "local":
+        return LocalLlmClient()
+    if provider == "openai-responses":
+        from engine.llm.openai_responses import OpenAIResponsesClient
+
+        return OpenAIResponsesClient(settings)
+    if provider == "openai-compatible":
+        from engine.llm.openai_compatible import OpenAICompatibleClient
+
+        return OpenAICompatibleClient(settings)
+    if provider == "anthropic-messages":
+        from engine.llm.anthropic_messages import AnthropicMessagesClient
+
+        return AnthropicMessagesClient(settings)
+    raise ValueError(f"Unsupported llm provider: {settings.provider}")
 
 
 def _find_font(text: str, fonts: List[str]) -> Optional[str]:

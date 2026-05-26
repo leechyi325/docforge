@@ -2,13 +2,53 @@ FORMAT_OVERRIDE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
-        "title": {"$ref": "#/$defs/paragraphStyle"},
-        "body": {"$ref": "#/$defs/paragraphStyle"},
+        "title": {"anyOf": [{"$ref": "#/$defs/paragraphStyle"}, {"type": "null"}]},
+        "body": {"anyOf": [{"$ref": "#/$defs/paragraphStyle"}, {"type": "null"}]},
         "headings": {
             "type": "object",
-            "additionalProperties": {"$ref": "#/$defs/paragraphStyle"},
+            "additionalProperties": False,
+            "properties": {
+                "heading_1": {"$ref": "#/$defs/paragraphStyle"},
+                "heading_2": {"$ref": "#/$defs/paragraphStyle"},
+                "heading_3": {"$ref": "#/$defs/paragraphStyle"},
+            },
+            "required": ["heading_1", "heading_2", "heading_3"],
         },
         "page": {
+            "anyOf": [
+                {"$ref": "#/$defs/pageSetup"},
+                {"type": "null"},
+            ]
+        },
+        "notes": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["title", "body", "headings", "page", "notes"],
+    "$defs": {
+        "paragraphStyle": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "font": {"type": ["string", "null"]},
+                "size": {"type": ["string", "null"]},
+                "bold": {"type": ["boolean", "null"]},
+                "align": {"enum": ["left", "center", "right", "justify", None]},
+                "first_line_indent": {"type": ["string", "null"]},
+                "line_spacing": {"type": ["string", "null"]},
+                "space_before": {"type": ["string", "null"]},
+                "space_after": {"type": ["string", "null"]},
+            },
+            "required": [
+                "font",
+                "size",
+                "bold",
+                "align",
+                "first_line_indent",
+                "line_spacing",
+                "space_before",
+                "space_after",
+            ],
+        },
+        "pageSetup": {
             "type": "object",
             "additionalProperties": False,
             "properties": {
@@ -18,24 +58,8 @@ FORMAT_OVERRIDE_SCHEMA = {
                 "margin_left": {"type": "string"},
                 "margin_right": {"type": "string"},
             },
+            "required": ["paper", "margin_top", "margin_bottom", "margin_left", "margin_right"],
         },
-        "notes": {"type": "array", "items": {"type": "string"}},
-    },
-    "$defs": {
-        "paragraphStyle": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "font": {"type": "string"},
-                "size": {"type": "string"},
-                "bold": {"type": "boolean"},
-                "align": {"enum": ["left", "center", "right", "justify"]},
-                "first_line_indent": {"type": "string"},
-                "line_spacing": {"type": "string"},
-                "space_before": {"type": "string"},
-                "space_after": {"type": "string"},
-            },
-        }
     },
 }
 

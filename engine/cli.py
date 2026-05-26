@@ -2,18 +2,40 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import List, Optional
 
 from pydantic import TypeAdapter
 
-from engine.converters.pandoc import convert_markdown_to_docx
 from engine.diagnostics.diagnose import diagnose_docx
 from engine.fixer.apply_fixes import apply_fixes
-from engine.formatter.docx_formatter import apply_profile_formatting
-from engine.llm.client import parse_format_instruction_locally
+from engine.llm.client import create_llm_client
+from engine.llm.settings import LlmSettings
 from engine.models import Issue
+from engine.pipeline import UnsupportedInputError, format_document
 from engine.profiles.loader import load_profile
+
+
+def _add_formatting_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--input", required=True)
+    parser.add_argument("--profile", default="general")
+    parser.add_argument("--format-instruction", default="")
+    parser.add_argument(
+        "--llm-provider",
+        choices=[
+            "local",
+            "openai",
+            "openai-responses",
+            "openai-compatible",
+            "anthropic-messages",
+        ],
+        default="local",
+    )
+    parser.add_argument("--llm-model", default=None)
+    parser.add_argument("--llm-base-url", default=None)
+    parser.add_argument("--api-key", default=None)
+    parser.add_argument("--output", required=True)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -21,12 +43,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     generate = subparsers.add_parser("generate")
-    generate.add_argument("--input", required=True)
-    generate.add_argument("--profile", default="general")
-    generate.add_argument("--format-instruction", default="")
-    generate.add_argument("--llm-provider", choices=["local", "openai"], default="local")
-    generate.add_argument("--api-key", default=None)
-    generate.add_argument("--output", required=True)
+    _add_formatting_args(generate)
+
+    format_parser = subparsers.add_parser("format")
+    _add_formatting_args(format_parser)
 
     diagnose = subparsers.add_parser("diagnose")
     diagnose.add_argument("--input", required=True)
@@ -39,22 +59,21 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     args = parser.parse_args(argv)
 
-    if args.command == "generate":
-        profile = load_profile(args.profile)
-        output_path = Path(args.output)
-        temp_docx = output_path.with_suffix(".pandoc.docx")
-        convert_markdown_to_docx(Path(args.input), temp_docx)
-        override = None
-        if args.format_instruction:
-            if args.llm_provider == "openai":
-                from engine.llm.client import OpenAIClient
+    if args.command in {"generate", "format"}:
+        try:
+            profile = load_profile(args.profile)
+            override = _parse_format_override(args)
+            result = format_document(Path(args.input), Path(args.output), profile, override)
+        except Exception as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
-                override = OpenAIClient(api_key=args.api_key).parse_format_instruction(args.format_instruction)
-            else:
-                override = parse_format_instruction_locally(args.format_instruction)
-        apply_profile_formatting(temp_docx, output_path, profile, override)
-        issues = diagnose_docx(output_path, profile)
-        print(json.dumps({"output": str(output_path), "issues": [issue.model_dump() for issue in issues]}, ensure_ascii=False))
+        print(
+            json.dumps(
+                {"output": str(result.output_path), "issues": [issue.model_dump() for issue in result.issues]},
+                ensure_ascii=False,
+            )
+        )
         return 0
 
     if args.command == "diagnose":
@@ -70,6 +89,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     return 2
+
+
+def _parse_format_override(args: argparse.Namespace):
+    if not args.format_instruction:
+        return None
+
+    settings = LlmSettings(
+        provider=args.llm_provider,
+        api_key=args.api_key,
+        model=args.llm_model,
+        base_url=args.llm_base_url,
+    )
+    return create_llm_client(settings).parse_format_instruction(args.format_instruction)
 
 
 if __name__ == "__main__":

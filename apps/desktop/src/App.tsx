@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { FileText, Wrench } from "lucide-react";
 import { useState } from "react";
 import type { GenerateResponse, Issue, LlmProvider, ProfileId } from "./types";
@@ -56,7 +57,51 @@ export function App() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [status, setStatus] = useState("等待选择文件");
 
+  async function handleSelectInput() {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: "文档文件", extensions: ["md", "markdown", "docx"] }],
+    });
+    if (selected) {
+      setInputPath(selected);
+      const suggested = selected.replace(/\.(md|markdown|docx)$/i, ".docx");
+      if (!outputPath) {
+        setOutputPath(suggested);
+      }
+    }
+  }
+
+  async function handleSelectOutput() {
+    const selected = await save({
+      filters: [{ name: "Word 文档", extensions: ["docx"] }],
+      defaultPath: outputPath || undefined,
+    });
+    if (selected) {
+      setOutputPath(selected);
+    }
+  }
+
+  async function validateBeforeGenerate(): Promise<boolean> {
+    try {
+      const inputResult = await invoke<{ valid: boolean; error: string | null }>("validate_path", { path: inputPath, pathType: "input" });
+      if (!inputResult.valid) {
+        setStatus(`输入路径无效：${inputResult.error}`);
+        return false;
+      }
+      const outputResult = await invoke<{ valid: boolean; error: string | null }>("validate_path", { path: outputPath, pathType: "output" });
+      if (!outputResult.valid) {
+        setStatus(`输出路径无效：${outputResult.error}`);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      setStatus(`路径校验失败：${getErrorMessage(error)}`);
+      return false;
+    }
+  }
+
   async function handleGenerate() {
+    if (!(await validateBeforeGenerate())) return;
     setStatus(inputPath.trim().toLowerCase().endsWith(".docx") ? "正在整理 docx 格式" : "正在转换并整理 docx");
     setIssues([]);
 
@@ -113,11 +158,21 @@ export function App() {
           </label>
           <label>
             输入文件
-            <input value={inputPath} onChange={(event) => setInputPath(event.target.value)} placeholder="/path/to/input.md 或 /path/to/input.docx" />
+            <div className="path-input">
+              <input value={inputPath} onChange={(event) => setInputPath(event.target.value)} placeholder="/path/to/input.md 或 /path/to/input.docx" />
+              <button className="iconButton" type="button" onClick={handleSelectInput} title="浏览文件">
+                <FileText size={16} />
+              </button>
+            </div>
           </label>
           <label>
             输出 docx
-            <input value={outputPath} onChange={(event) => setOutputPath(event.target.value)} placeholder="/path/to/output.docx" />
+            <div className="path-input">
+              <input value={outputPath} onChange={(event) => setOutputPath(event.target.value)} placeholder="/path/to/output.docx" />
+              <button className="iconButton" type="button" onClick={handleSelectOutput} title="选择保存位置">
+                <FileText size={16} />
+              </button>
+            </div>
           </label>
           <label>
             文档类型

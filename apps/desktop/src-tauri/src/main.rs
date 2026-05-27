@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Debug, Deserialize)]
@@ -101,6 +101,40 @@ fn run_engine(python: &str, request: &GenerateRequest) -> Result<String, String>
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PathValidation {
+    valid: bool,
+    error: Option<String>,
+}
+
+#[tauri::command]
+fn validate_path(path: String, path_type: String) -> PathValidation {
+    let p = PathBuf::from(&path);
+
+    if path_type == "input" {
+        if !p.exists() {
+            return PathValidation { valid: false, error: Some("文件不存在".to_string()) };
+        }
+        let suffix = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if suffix == "doc" {
+            return PathValidation { valid: false, error: Some("不支持 .doc 格式，请使用 .docx 或 .md".to_string()) };
+        }
+        if suffix != "md" && suffix != "markdown" && suffix != "docx" {
+            return PathValidation { valid: false, error: Some("仅支持 .md 和 .docx 格式".to_string()) };
+        }
+    }
+
+    if path_type == "output" {
+        let suffix = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if suffix != "docx" {
+            return PathValidation { valid: false, error: Some("输出文件必须是 .docx 格式".to_string()) };
+        }
+    }
+
+    PathValidation { valid: true, error: None }
+}
+
 fn repo_root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -111,7 +145,8 @@ fn repo_root() -> &'static Path {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![generate_docx])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![generate_docx, validate_path])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");
 }

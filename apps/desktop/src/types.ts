@@ -29,3 +29,8 @@ export type GenerateResponse = {
   output: string;
   issues: Issue[];
 };
+
+export type PathValidation = {
+  valid: boolean;
+  error: string | null;
+};

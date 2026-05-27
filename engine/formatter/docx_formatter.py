@@ -5,6 +5,7 @@ from typing import Optional
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 
 from engine.models import FormatOverride, PageSetup, ParagraphStyle, Profile
@@ -25,7 +26,10 @@ def apply_profile_formatting(
     override: Optional[FormatOverride] = None,
 ) -> Path:
     document = Document(input_docx)
-    _apply_page_setup(document, override.page if override and override.page else profile.page)
+    page = override.page if override and override.page else profile.page
+    _apply_page_setup(document, page)
+    if page.page_number:
+        _apply_page_numbering(document, page.page_number)
 
     title_style = merge_style(profile.title, override.title if override else None)
     body_style = merge_style(profile.body, override.body if override else None)
@@ -80,3 +84,68 @@ def _apply_paragraph_style(paragraph, style: ParagraphStyle) -> None:
 def _looks_like_heading(text: str) -> bool:
     stripped = text.strip()
     return stripped.startswith(("一、", "二、", "三、", "四、", "五、", "（一）", "（二）", "（三）"))
+
+
+def _apply_page_numbering(document, page_number) -> None:
+    from docx.oxml import OxmlElement
+
+    for section in document.sections:
+        footer = section.footer
+        footer.is_linked_to_previous = False
+
+        for para in footer.paragraphs:
+            for run in para.runs:
+                run.clear()
+
+        if footer.paragraphs:
+            para = footer.paragraphs[0]
+        else:
+            para = footer.add_paragraph()
+
+        align_map = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER, "right": WD_ALIGN_PARAGRAPH.RIGHT}
+        para.alignment = align_map.get(page_number.odd_align, WD_ALIGN_PARAGRAPH.RIGHT)
+
+        run_prefix = para.add_run("－ ")
+        _apply_run_font(run_prefix, page_number.font, page_number.size)
+
+        fld_char_begin = OxmlElement("w:fldChar")
+        fld_char_begin.set(qn("w:fldCharType"), "begin")
+
+        instr_text = OxmlElement("w:instrText")
+        instr_text.set(qn("xml:space"), "preserve")
+        instr_text.text = " PAGE "
+
+        fld_char_separate = OxmlElement("w:fldChar")
+        fld_char_separate.set(qn("w:fldCharType"), "separate")
+
+        fld_char_end = OxmlElement("w:fldChar")
+        fld_char_end.set(qn("w:fldCharType"), "end")
+
+        run_field = para.add_run()
+        _apply_run_font(run_field, page_number.font, page_number.size)
+        run_field._element.append(fld_char_begin)
+
+        run_instr = para.add_run()
+        _apply_run_font(run_instr, page_number.font, page_number.size)
+        run_instr._element.append(instr_text)
+
+        run_sep = para.add_run()
+        _apply_run_font(run_sep, page_number.font, page_number.size)
+        run_sep._element.append(fld_char_separate)
+
+        run_end = para.add_run()
+        _apply_run_font(run_end, page_number.font, page_number.size)
+        run_end._element.append(fld_char_end)
+
+        run_suffix = para.add_run(" －")
+        _apply_run_font(run_suffix, page_number.font, page_number.size)
+
+
+def _apply_run_font(run, font_name, size) -> None:
+    if font_name:
+        run.font.name = font_name
+        run._element.rPr.rFonts.set(
+            "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}eastAsia", font_name
+        )
+    if size:
+        run.font.size = Pt(chinese_size_to_pt(size))

@@ -38,12 +38,19 @@ def apply_profile_formatting(
     for index, paragraph in enumerate(document.paragraphs):
         if index == 0:
             _apply_paragraph_style(paragraph, title_style)
-        elif _looks_like_heading(paragraph.text):
-            style_key = "heading_1" if paragraph.text.strip().startswith(("一、", "二、", "三、")) else "heading_2"
-            base = profile.headings.get(style_key, body_style)
-            _apply_paragraph_style(paragraph, merge_style(base, heading_overrides.get(style_key)))
+        elif profile.date_field and index == 1:
+            _apply_paragraph_style(paragraph, profile.date_field)
+        elif profile.department_field and index == 2:
+            _apply_paragraph_style(paragraph, profile.department_field)
         else:
-            _apply_paragraph_style(paragraph, body_style)
+            heading_key = _detect_heading_key(paragraph.text)
+            if heading_key:
+                base = profile.headings.get(heading_key, body_style)
+                _apply_paragraph_style(paragraph, merge_style(base, heading_overrides.get(heading_key)))
+            else:
+                _apply_paragraph_style(paragraph, body_style)
+                if profile.content_bold:
+                    _apply_content_bold(paragraph, profile.content_bold)
 
     output_docx.parent.mkdir(parents=True, exist_ok=True)
     document.save(output_docx)
@@ -81,9 +88,20 @@ def _apply_paragraph_style(paragraph, style: ParagraphStyle) -> None:
             run.font.bold = style.bold
 
 
-def _looks_like_heading(text: str) -> bool:
+def _detect_heading_key(text: str) -> str | None:
     stripped = text.strip()
-    return stripped.startswith(("一、", "二、", "三、", "四、", "五、", "（一）", "（二）", "（三）"))
+    if stripped.startswith(("一、", "二、", "三、", "四、", "五、", "六、", "七、", "八、", "九、")):
+        return "heading_1"
+    if stripped.startswith(("（一）", "（二）", "（三）", "（四）", "（五）")):
+        return "heading_2"
+    if _looks_like_heading_3(stripped):
+        return "heading_3"
+    return None
+
+
+def _looks_like_heading_3(text: str) -> bool:
+    import re
+    return bool(re.match(r"^\d+[\.\、]", text))
 
 
 def _apply_page_numbering(document, page_number) -> None:
@@ -149,3 +167,15 @@ def _apply_run_font(run, font_name, size) -> None:
         )
     if size:
         run.font.size = Pt(chinese_size_to_pt(size))
+
+
+def _apply_content_bold(paragraph, bold_style: ParagraphStyle) -> None:
+    for run in paragraph.runs:
+        if run.font.bold:
+            if bold_style.font:
+                run.font.name = bold_style.font
+                run._element.rPr.rFonts.set(
+                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}eastAsia", bold_style.font
+                )
+            if bold_style.size:
+                run.font.size = Pt(chinese_size_to_pt(bold_style.size))

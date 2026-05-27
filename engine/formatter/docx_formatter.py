@@ -6,7 +6,7 @@ from typing import Optional
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
-from docx.shared import Cm, Pt
+from docx.shared import Cm, Pt, RGBColor
 
 from engine.models import FormatOverride, PageSetup, ParagraphStyle, Profile
 from engine.style_utils import chinese_size_to_pt, merge_style, parse_length_to_pt
@@ -86,6 +86,7 @@ def _apply_paragraph_style(paragraph, style: ParagraphStyle) -> None:
             run.font.size = Pt(chinese_size_to_pt(style.size))
         if style.bold is not None:
             run.font.bold = style.bold
+        run.font.color.rgb = RGBColor(0, 0, 0)
 
 
 def _detect_heading_key(text: str) -> str | None:
@@ -167,6 +168,7 @@ def _apply_run_font(run, font_name, size) -> None:
         )
     if size:
         run.font.size = Pt(chinese_size_to_pt(size))
+    run.font.color.rgb = RGBColor(0, 0, 0)
 
 
 def _apply_content_bold(paragraph, bold_style: ParagraphStyle) -> None:
@@ -179,3 +181,4 @@ def _apply_content_bold(paragraph, bold_style: ParagraphStyle) -> None:
                 )
             if bold_style.size:
                 run.font.size = Pt(chinese_size_to_pt(bold_style.size))
+            run.font.color.rgb = RGBColor(0, 0, 0)

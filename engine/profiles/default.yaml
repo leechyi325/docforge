@@ -1,0 +1,76 @@
+id: default
+name: 默认文稿模板
+required_fields:
+  - title
+  - body
+page:
+  paper: A4
+  margin_top: 3.5cm
+  margin_bottom: 3.5cm
+  margin_left: 2.8cm
+  margin_right: 2.8cm
+  page_number:
+    font: 宋体
+    size: 四号
+    format: "－ {page} －"
+    odd_align: right
+    even_align: left
+title:
+  font: 宋体
+  size: 二号
+  bold: true
+  align: center
+  line_spacing: 29pt
+date_field:
+  font: 楷体_GB2312
+  size: 三号
+  bold: true
+  align: center
+  line_spacing: 29pt
+department_field:
+  font: 楷体_GB2312
+  size: 三号
+  bold: true
+  align: center
+  line_spacing: 29pt
+body:
+  font: 仿宋_GB2312
+  size: 三号
+  align: justify
+  first_line_indent: 2em
+  line_spacing: 29pt
+  space_before: 0pt
+  space_after: 0pt
+headings:
+  heading_1:
+    font: 黑体
+    size: 三号
+    bold: true
+    align: left
+    line_spacing: 29pt
+    first_line_indent: 2em
+  heading_2:
+    font: 楷体_GB2312
+    size: 三号
+    bold: true
+    align: left
+    line_spacing: 29pt
+    first_line_indent: 2em
+  heading_3:
+    font: 仿宋_GB2312
+    size: 三号
+    bold: true
+    align: left
+    line_spacing: 29pt
+    first_line_indent: 2em
+content_bold:
+  font: 楷体_GB2312
+  size: 三号
+  bold: true
+special_sections: {}
+auto_fix_rules:
+  - title_style
+  - body_style
+  - heading_style
+  - page_setup
+template: null

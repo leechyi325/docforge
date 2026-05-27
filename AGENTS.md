@@ -66,16 +66,19 @@ Key areas:
 - `apps/desktop/src-tauri`: Tauri shell and Python CLI invocation.
 - `docs/superpowers/specs/2026-05-25-docforge-desktop-design.md`: design spec.
 - `docs/superpowers/plans/2026-05-25-docforge-desktop-implementation.md`: implementation plan/history.
+- `docs/superpowers/specs/2026-05-26-docforge-round-two-design.md`: second-round design spec.
+- `docs/superpowers/plans/2026-05-26-docforge-round-two-implementation.md`: second-round implementation plan/history.
+- `docs/handoff-2026-05-27.md`: current handoff summary and next recommended work.
 
 ## Model Boundary
 
-OpenAI can help with:
+Remote model providers can help with:
 
 - Document structure recognition.
 - Parsing temporary natural-language format instructions into structured overrides.
 - Format diagnosis assistance.
 
-OpenAI must not:
+Remote model providers must not:
 
 - Generate the final Word file directly.
 - Modify `.docx` files directly.
@@ -118,6 +121,20 @@ Use API-backed providers only when needed:
   --output output.docx
 ```
 
+For OpenAI-compatible gateways:
+
+```bash
+.venv/bin/python -m engine.cli format \
+  --input input.docx \
+  --profile general \
+  --format-instruction "标题居中，正文仿宋三号" \
+  --llm-provider openai-compatible \
+  --llm-base-url https://api.example.com/v1 \
+  --llm-model deepseek-chat \
+  --api-key "$PROVIDER_API_KEY" \
+  --output output.docx
+```
+
 ## Profiles
 
 Profile precedence is:
@@ -145,6 +162,8 @@ cd apps/desktop
 export DOCFORGE_PYTHON="$(pwd)/../../.venv/bin/python"
 npm run tauri dev
 ```
+
+Do not use `npm run dev` for real document processing. That starts a browser/Vite page without the Tauri IPC bridge, so it cannot call the Rust command or Python engine. It is only useful for UI-only checks.
 
 Do not duplicate formatting business logic in React or Rust unless there is a strong reason. Keep formatting, diagnosis, and fixing inside the Python engine. The desktop should pass provider, model, and base URL settings through to the CLI rather than reimplementing provider behavior. API keys collected by the desktop should be passed to the child process through provider environment variables, not CLI argv.
 
@@ -189,6 +208,13 @@ cd apps/desktop
 npm run build
 ```
 
+For Tauri/Rust changes:
+
+```bash
+cd apps/desktop/src-tauri
+cargo check
+```
+
 For Pandoc conversion behavior, run the relevant tests only when Pandoc is installed:
 
 ```bash
@@ -209,6 +235,13 @@ Known verification state after the second-round implementation:
 - Pandoc e2e: passed when Pandoc was available.
 - Rust/Tauri compile check was not run because `cargo` was not installed in the environment.
 
+Known verification state after desktop processing hardening on 2026-05-27:
+
+- Python test suite: 47 passed.
+- Frontend build: passed.
+- Rust/Tauri compile check: `cargo check` passed.
+- Latest pushed commit at handoff time: `d11fdf1 fix: harden desktop document processing`.
+
 Do not claim Tauri/Rust compilation is verified unless you actually run it successfully.
 
 ## Git And Generated Files
@@ -222,6 +255,14 @@ Do not commit generated or dependency directories:
 - `dist/`
 - `.pytest_cache/`
 - `__pycache__/`
+- `target/`
+- `apps/desktop/src-tauri/gen/`
+
+Commit these desktop shell files when they change:
+
+- `apps/desktop/src-tauri/Cargo.lock`
+- `apps/desktop/src-tauri/build.rs`
+- `apps/desktop/src-tauri/icons/icon.png`
 
 The user previously said not to commit unless explicitly requested. Check `git status --short` and `git diff` before and after edits, and do not revert unrelated user changes.
 

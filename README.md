@@ -1,6 +1,13 @@
 # DocForge
 
-DocForge 文档格式智能整理桌面软件雏形。第一版支持 Markdown 和 `.docx` 格式整理、文档 profile、临时格式指令、格式诊断和安全修复。
+DocForge 文档格式智能整理桌面软件雏形。当前版本支持 Markdown 和 `.docx` 格式整理、文档 profile、临时格式指令、格式诊断、安全修复，以及多种模型协议的格式指令解析。
+
+## Current Status
+
+- Code baseline through `d11fdf1` has been merged and pushed to `origin/main`.
+- Main handoff note: [docs/handoff-2026-05-27.md](docs/handoff-2026-05-27.md).
+- Preferred CLI entry point: `format`, which accepts Markdown and `.docx` input.
+- Desktop processing requires the Tauri runtime. `npm run dev` is useful for UI-only work; use `npm run tauri dev` for real document processing.
 
 ## Python Engine
 
@@ -70,15 +77,14 @@ Use Anthropic Messages:
 
 ## Desktop
 
-Install and run:
+Install frontend dependencies:
 
 ```bash
 cd apps/desktop
 npm install
-npm run dev
 ```
 
-Run Tauri during desktop development:
+Run the desktop app during development:
 
 ```bash
 cd apps/desktop
@@ -86,9 +92,28 @@ export DOCFORGE_PYTHON="$(pwd)/../../.venv/bin/python"
 npm run tauri dev
 ```
 
+Use plain Vite only for UI-only checks:
+
+```bash
+cd apps/desktop
+npm run dev
+```
+
+The browser page opened by `npm run dev` cannot call the Rust/Python backend. Document processing must be tested through Tauri or a packaged desktop app.
+
+Verify desktop code:
+
+```bash
+cd apps/desktop
+npm run build
+cd src-tauri
+cargo check
+```
+
 ## Notes
 
 - Pandoc must be available on `PATH` for Markdown to `.docx` conversion.
 - LLM provider adapters are isolated in `engine/llm`. Supported providers are `local`, `openai`/`openai-responses`, `openai-compatible`, and `anthropic-messages`.
 - Use `--llm-provider local` for deterministic development tests.
+- API keys entered in the desktop app are passed to the Python child process through environment variables, not command-line argv.
 - The current MVP does not support legacy `.doc` input, Word/WPS plugins, content rewriting, or online preview.

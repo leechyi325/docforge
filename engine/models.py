@@ -18,6 +18,16 @@ class ParagraphStyle(BaseModel):
     space_after: Optional[str] = None
 
 
+class PageNumbering(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    font: Optional[str] = None
+    size: Optional[str] = None
+    format: str = "{page}"
+    odd_align: Literal["left", "center", "right"] = "right"
+    even_align: Literal["left", "center", "right"] = "left"
+
+
 class PageSetup(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -26,6 +36,7 @@ class PageSetup(BaseModel):
     margin_bottom: str = "3.5cm"
     margin_left: str = "2.8cm"
     margin_right: str = "2.6cm"
+    page_number: Optional[PageNumbering] = None
 
 
 class Profile(BaseModel):
@@ -41,6 +52,9 @@ class Profile(BaseModel):
     special_sections: Dict[str, ParagraphStyle] = Field(default_factory=dict)
     auto_fix_rules: List[str] = Field(default_factory=list)
     template: Optional[str] = None
+    date_field: Optional[ParagraphStyle] = None
+    department_field: Optional[ParagraphStyle] = None
+    content_bold: Optional[ParagraphStyle] = None
 
 
 class FormatOverride(BaseModel):

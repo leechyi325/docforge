@@ -74,3 +74,40 @@ def test_format_document_accepts_markdown_input(tmp_path):
     assert result.output_path == output
     assert output.exists()
     assert Document(output).paragraphs[0].text.strip() == "测试标题"
+
+
+import json
+import sys
+
+
+def test_format_document_emits_progress_events(tmp_path, monkeypatch):
+    source = tmp_path / "source.docx"
+    output = tmp_path / "output.docx"
+    doc = Document()
+    doc.add_paragraph("测试标题")
+    doc.add_paragraph("正文")
+    doc.save(source)
+
+    captured = []
+
+    original_stderr = sys.stderr
+
+    class FakeStderr:
+        def write(self, data):
+            stripped = data.strip()
+            if stripped.startswith("{"):
+                try:
+                    captured.append(json.loads(stripped))
+                except json.JSONDecodeError:
+                    pass
+            return len(data)
+        def flush(self):
+            pass
+
+    monkeypatch.setattr(sys, "stderr", FakeStderr())
+
+    format_document(source, output, load_profile("general"))
+
+    stages = [e.get("stage") for e in captured if "stage" in e]
+    assert "formatting" in stages
+    assert "diagnosing" in stages

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
@@ -10,6 +12,13 @@ from engine.formatter.docx_formatter import apply_profile_formatting
 from engine.models import FormatOverride, Issue, Profile
 
 MARKDOWN_SUFFIXES = {".md", ".markdown"}
+
+
+def _emit_progress(stage: str, message: str, progress: float | None = None) -> None:
+    event = {"stage": stage, "message": message}
+    if progress is not None:
+        event["progress"] = progress
+    print(json.dumps(event, ensure_ascii=False), file=sys.stderr, flush=True)
 
 
 class UnsupportedInputError(ValueError):
@@ -32,9 +41,20 @@ def format_document(
     output_path = Path(output_path)
     _validate_paths(input_path, output_path)
 
+    _emit_progress("preparing", "验证输入路径", 0.1)
+
     source_docx = _prepare_source_docx(input_path, output_path)
+
+    _emit_progress("formatting", "正在应用格式化规则", 0.4)
+
     apply_profile_formatting(source_docx, output_path, profile, override)
+
+    _emit_progress("diagnosing", "正在诊断格式问题", 0.7)
+
     issues = diagnose_docx(output_path, profile)
+
+    _emit_progress("done", "处理完成", 1.0)
+
     return FormatResult(output_path=output_path, issues=issues)
 
 

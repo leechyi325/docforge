@@ -1,4 +1,4 @@
-# AGENTS.md
+# CLAUDE.md
 
 This file is the handoff guide for agents working on DocForge.
 

@@ -23,3 +23,19 @@ def test_local_parser_is_available_through_client_factory():
 
     assert override.body.font == "仿宋"
     assert override.body.line_spacing == "28pt"
+
+
+def test_local_parser_handles_heading_2():
+    override = parse_format_instruction_locally(
+        "标题宋体二号居中，正文仿宋三号，行距29磅，二级标题楷体三号"
+    )
+    assert override.headings["heading_2"].font == "楷体"
+
+
+def test_local_parser_handles_heading_3():
+    override = parse_format_instruction_locally(
+        "标题宋体二号居中，正文仿宋三号，行距29磅，一级标题黑体三号，二级标题楷体三号，三级标题仿宋三号加粗"
+    )
+    assert override.headings["heading_1"].font == "黑体"
+    assert override.headings["heading_2"].font == "楷体"
+    assert override.headings["heading_3"].font == "仿宋"

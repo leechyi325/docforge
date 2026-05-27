@@ -45,6 +45,21 @@ def parse_format_instruction_locally(instruction: str) -> FormatOverride:
             size=_find_size_near(instruction, "一级标题"),
         )
 
+    if "二级标题" in instruction:
+        headings["heading_2"] = ParagraphStyle(
+            font=_find_font_after(instruction, "二级标题", ["楷体", "黑体", "仿宋", "宋体"]),
+            size=_find_size_near(instruction, "二级标题"),
+        )
+
+    if "三级标题" in instruction:
+        headings["heading_3"] = ParagraphStyle(
+            font=_find_font_after(instruction, "三级标题", ["仿宋", "楷体", "黑体", "宋体"]),
+            size=_find_size_near(instruction, "三级标题"),
+        )
+        h3_start = instruction.find("三级标题")
+        if "加粗" in instruction[h3_start:h3_start + 30]:
+            headings["heading_3"].bold = True
+
     return FormatOverride(title=title, body=body, headings=headings)
 
 

@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tauri::Emitter;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,11 +26,11 @@ struct EngineResult {
 }
 
 #[tauri::command]
-fn generate_docx(request: GenerateRequest) -> Result<EngineResult, String> {
+fn generate_docx(request: GenerateRequest, app_handle: tauri::AppHandle) -> Result<EngineResult, String> {
     let mut errors = Vec::new();
 
     for python in python_candidates() {
-        match run_engine(&python, &request) {
+        match run_engine(&python, &request, Some(&app_handle)) {
             Ok(output) => return Ok(EngineResult { stdout: output }),
             Err(error) => errors.push(format!("{python}: {error}")),
         }
@@ -60,7 +62,11 @@ fn push_candidate(candidates: &mut Vec<String>, python: String) {
     }
 }
 
-fn run_engine(python: &str, request: &GenerateRequest) -> Result<String, String> {
+fn run_engine(
+    python: &str,
+    request: &GenerateRequest,
+    app_handle: Option<&tauri::AppHandle>,
+) -> Result<String, String> {
     let mut command = Command::new(python);
     command
         .args([
@@ -82,7 +88,9 @@ fn run_engine(python: &str, request: &GenerateRequest) -> Result<String, String>
             "--output",
             &request.output_path,
         ])
-        .current_dir(repo_root());
+        .current_dir(repo_root())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
 
     if !request.api_key.trim().is_empty() {
         let env_key = if request.llm_provider == "anthropic-messages" {
@@ -93,13 +101,37 @@ fn run_engine(python: &str, request: &GenerateRequest) -> Result<String, String>
         command.env(env_key, &request.api_key);
     }
 
-    let output = command.output().map_err(|error| error.to_string())?;
+    let mut child = command.spawn().map_err(|error| error.to_string())?;
 
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    // Stream stderr progress events in a background thread
+    if let Some(stderr) = child.stderr.take() {
+        let handle = app_handle.cloned();
+        std::thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines().map_while(Result::ok) {
+                if let Some(ref h) = handle {
+                    let _ = h.emit("engine-progress", &line);
+                }
+            }
+        });
     }
 
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    // Read stdout
+    let mut stdout = String::new();
+    if let Some(out) = child.stdout.take() {
+        let reader = BufReader::new(out);
+        for line in reader.lines().map_while(Result::ok) {
+            stdout.push_str(&line);
+            stdout.push('\n');
+        }
+    }
+
+    let status = child.wait().map_err(|error| error.to_string())?;
+    if !status.success() {
+        return Err("engine process failed".to_string());
+    }
+
+    Ok(stdout)
 }
 
 #[derive(Debug, Serialize)]

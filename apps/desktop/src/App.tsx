@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { FileText, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
+import { LogPanel, type LogEntry } from "./LogPanel";
 import { SettingsPage } from "./SettingsPage";
 import type { AppSettings, GenerateResponse, Issue, ProfileId } from "./types";
 
@@ -58,9 +60,38 @@ export function App() {
   const defaultSettings: AppSettings = { llmProvider: "local", llmModel: "", llmBaseUrl: "", apiKey: "" };
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [showSettings, setShowSettings] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [progress, setProgress] = useState(0);
+  const [logExpanded, setLogExpanded] = useState(false);
 
   useEffect(() => {
     invoke<AppSettings>("load_settings").then(setSettings).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const unlisten = listen<string>("engine-progress", (event) => {
+      try {
+        const data = JSON.parse(event.payload);
+        const entry: LogEntry = {
+          timestamp: new Date().toLocaleTimeString(),
+          stage: data.stage || "unknown",
+          message: data.message || "",
+          progress: data.progress,
+        };
+        setLogs((prev) => [...prev, entry]);
+        if (data.progress !== undefined) {
+          setProgress(data.progress);
+        }
+        if (data.stage) {
+          setStatus(data.message || data.stage);
+        }
+      } catch {
+        // Non-JSON stderr line, ignore
+      }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   async function handleSelectInput() {
@@ -110,6 +141,8 @@ export function App() {
     if (!(await validateBeforeGenerate())) return;
     setStatus(inputPath.trim().toLowerCase().endsWith(".docx") ? "正在整理 docx 格式" : "正在转换并整理 docx");
     setIssues([]);
+    setLogs([]);
+    setProgress(0);
 
     try {
       if (!isTauriInvokeAvailable()) {
@@ -187,7 +220,11 @@ export function App() {
 
         <section className="panel status">
           <h2>处理状态</h2>
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${progress * 100}%` }} />
+          </div>
           <p>{status}</p>
+          <LogPanel logs={logs} expanded={logExpanded} onToggle={() => setLogExpanded(!logExpanded)} />
         </section>
 
         <section className="panel issues">

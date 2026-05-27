@@ -17,5 +17,13 @@
         "height": 760
       }
     ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "externalBin": [
+      "binaries/docforge-engine",
+      "binaries/pandoc"
+    ]
   }
 }

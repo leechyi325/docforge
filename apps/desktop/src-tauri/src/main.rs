@@ -1,10 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::env;
+use std::collections::HashMap;
 use std::fs;
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use tauri::Emitter;
+use tauri_plugin_shell::ShellExt;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,51 +26,29 @@ struct EngineResult {
 
 #[tauri::command]
 fn generate_docx(request: GenerateRequest, app_handle: tauri::AppHandle) -> Result<EngineResult, String> {
-    let mut errors = Vec::new();
-
-    for python in python_candidates() {
-        match run_engine(&python, &request, Some(&app_handle)) {
-            Ok(output) => return Ok(EngineResult { stdout: output }),
-            Err(error) => errors.push(format!("{python}: {error}")),
-        }
-    }
-
-    Err(errors.join("; fallback failed: "))
-}
-
-fn python_candidates() -> Vec<String> {
-    let mut candidates = Vec::new();
-
-    if let Ok(python) = env::var("DOCFORGE_PYTHON") {
-        push_candidate(&mut candidates, python);
-    }
-
-    let venv_python = repo_root().join(".venv/bin/python");
-    if venv_python.exists() {
-        push_candidate(&mut candidates, venv_python.to_string_lossy().to_string());
-    }
-
-    push_candidate(&mut candidates, "python3".to_string());
-    push_candidate(&mut candidates, "python".to_string());
-    candidates
-}
-
-fn push_candidate(candidates: &mut Vec<String>, python: String) {
-    if !python.trim().is_empty() && !candidates.iter().any(|candidate| candidate == &python) {
-        candidates.push(python);
-    }
+    run_engine(&request, &app_handle).map(|stdout| EngineResult { stdout })
 }
 
 fn run_engine(
-    python: &str,
     request: &GenerateRequest,
-    app_handle: Option<&tauri::AppHandle>,
+    app_handle: &tauri::AppHandle,
 ) -> Result<String, String> {
-    let mut command = Command::new(python);
-    command
+    let mut envs = HashMap::new();
+
+    if !request.api_key.trim().is_empty() {
+        let env_key = if request.llm_provider == "anthropic-messages" {
+            "ANTHROPIC_API_KEY"
+        } else {
+            "OPENAI_API_KEY"
+        };
+        envs.insert(env_key.to_string(), request.api_key.clone());
+    }
+
+    let (mut rx, _child) = app_handle
+        .shell()
+        .sidecar("docforge-engine")
+        .map_err(|e| format!("failed to resolve engine sidecar: {e}"))?
         .args([
-            "-m",
-            "engine.cli",
             "format",
             "--input",
             &request.input_path,
@@ -88,47 +65,36 @@ fn run_engine(
             "--output",
             &request.output_path,
         ])
-        .current_dir(repo_root())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
+        .envs(envs)
+        .spawn()
+        .map_err(|e| format!("failed to spawn engine: {e}"))?;
 
-    if !request.api_key.trim().is_empty() {
-        let env_key = if request.llm_provider == "anthropic-messages" {
-            "ANTHROPIC_API_KEY"
-        } else {
-            "OPENAI_API_KEY"
-        };
-        command.env(env_key, &request.api_key);
-    }
+    let mut stdout = String::new();
 
-    let mut child = command.spawn().map_err(|error| error.to_string())?;
-
-    // Stream stderr progress events in a background thread
-    if let Some(stderr) = child.stderr.take() {
-        let handle = app_handle.cloned();
-        std::thread::spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines().map_while(Result::ok) {
-                if let Some(ref h) = handle {
+    use tauri_plugin_shell::process::CommandEvent;
+    while let Some(event) = rx.blocking_recv() {
+        match event {
+            CommandEvent::Stdout(line) => {
+                let line = String::from_utf8_lossy(&line).to_string();
+                stdout.push_str(&line);
+                stdout.push('\n');
+            }
+            CommandEvent::Stderr(line) => {
+                let line = String::from_utf8_lossy(&line).to_string();
+                if let Some(ref h) = Some(app_handle) {
                     let _ = h.emit("engine-progress", &line);
                 }
             }
-        });
-    }
-
-    // Read stdout
-    let mut stdout = String::new();
-    if let Some(out) = child.stdout.take() {
-        let reader = BufReader::new(out);
-        for line in reader.lines().map_while(Result::ok) {
-            stdout.push_str(&line);
-            stdout.push('\n');
+            CommandEvent::Terminated(status) => {
+                if !status.code.map_or(true, |c| c == 0) {
+                    return Err(format!("engine process exited with status {:?}", status.code));
+                }
+            }
+            CommandEvent::Error(e) => {
+                return Err(format!("engine error: {e}"));
+            }
+            _ => {}
         }
-    }
-
-    let status = child.wait().map_err(|error| error.to_string())?;
-    if !status.success() {
-        return Err("engine process failed".to_string());
     }
 
     Ok(stdout)
@@ -166,14 +132,6 @@ fn validate_path(path: String, path_type: String) -> PathValidation {
     }
 
     PathValidation { valid: true, error: None }
-}
-
-fn repo_root() -> &'static Path {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .and_then(Path::parent)
-        .expect("src-tauri should live under apps/desktop/src-tauri")
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -220,6 +178,7 @@ fn save_settings(settings: AppSettings) -> Result<(), String> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![generate_docx, validate_path, load_settings, save_settings])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");

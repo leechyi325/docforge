@@ -10,10 +10,6 @@ import type { AppSettings, GenerateResponse, Issue, ProfileId } from "./types";
 const profiles: Array<{ id: ProfileId; label: string }> = [
   { id: "default", label: "默认文稿模板" },
   { id: "general", label: "通用格式文档" },
-  { id: "official", label: "公文" },
-  { id: "meeting_minutes", label: "会议纪要" },
-  { id: "briefing", label: "汇报材料" },
-  { id: "speech", label: "讲话稿" },
 ];
 
 const missingTauriRuntimeMessage = "当前页面没有连接到 Tauri 桌面运行时。请使用 `cd apps/desktop && npm run tauri dev` 启动，或打开打包后的 DocForge 应用。";

@@ -20,8 +20,8 @@ def test_format_document_accepts_docx_input(tmp_path):
     assert result.output_path == output
     assert output.exists()
     formatted = Document(output)
-    assert formatted.paragraphs[0].runs[0].font.name == "方正小标宋"
-    assert formatted.paragraphs[1].runs[0].font.name == "仿宋"
+    assert formatted.paragraphs[0].runs[0].font.name == "宋体"
+    assert formatted.paragraphs[1].runs[0].font.name == "仿宋_GB2312"
     assert isinstance(result.issues, list)
 
 

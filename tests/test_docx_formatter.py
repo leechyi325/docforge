@@ -18,8 +18,8 @@ def test_apply_profile_formatting_sets_title_and_body(tmp_path):
 
     formatted = Document(output)
     assert formatted.paragraphs[0].alignment == 1
-    assert formatted.paragraphs[0].runs[0].font.name == "方正小标宋"
-    assert formatted.paragraphs[1].runs[0].font.name == "仿宋"
+    assert formatted.paragraphs[0].runs[0].font.name == "宋体"
+    assert formatted.paragraphs[1].runs[0].font.name == "仿宋_GB2312"
 
 
 def test_heading_3_detection_and_formatting(tmp_path):

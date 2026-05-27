@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import yaml
 
 from engine.models import Profile
 
-PROFILE_DIR = Path(__file__).resolve().parent
+
+def _get_profile_dir() -> Path:
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return Path(sys._MEIPASS) / "engine" / "profiles"
+    return Path(__file__).resolve().parent
+
+
+PROFILE_DIR = _get_profile_dir()
 
 
 def load_profile(profile_id: str) -> Profile:

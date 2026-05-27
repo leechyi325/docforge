@@ -1,15 +1,24 @@
 from engine.profiles.loader import list_profiles, load_profile
 
 
-def test_general_profile_is_default_and_lightweight():
+def test_general_profile_matches_default_style():
     profile = load_profile("general")
 
     assert profile.id == "general"
     assert profile.name == "通用格式文档"
-    assert profile.required_fields == []
+    assert profile.required_fields == ["title", "body"]
+    assert profile.title.font == "宋体"
     assert profile.title.size == "二号"
-    assert profile.body.font == "仿宋"
+    assert profile.title.bold is True
+    assert profile.body.font == "仿宋_GB2312"
+    assert profile.body.line_spacing == "29pt"
     assert profile.headings["heading_1"].font == "黑体"
+    assert profile.headings["heading_1"].bold is True
+    assert profile.headings["heading_2"].font == "楷体_GB2312"
+    assert "heading_3" in profile.headings
+    assert profile.date_field is None
+    assert profile.department_field is None
+    assert profile.content_bold is not None
 
 
 
@@ -52,4 +61,4 @@ def test_default_profile_loads_with_template_format():
 def test_all_profiles_load_including_default():
     ids = {profile.id for profile in list_profiles()}
     assert "default" in ids
-    assert ids == {"default", "official", "meeting_minutes", "briefing", "speech", "general"}
+    assert ids == {"default", "general"}

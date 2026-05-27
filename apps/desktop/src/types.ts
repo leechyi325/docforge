@@ -1,4 +1,4 @@
-export type ProfileId = "default" | "general" | "official" | "meeting_minutes" | "briefing" | "speech";
+export type ProfileId = "default" | "general";
 
 export type LlmProvider = "local" | "openai-responses" | "openai-compatible" | "anthropic-messages";
 

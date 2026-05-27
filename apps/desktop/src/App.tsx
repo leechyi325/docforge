@@ -1,10 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { FileText, Wrench } from "lucide-react";
-import { useState } from "react";
-import type { GenerateResponse, Issue, LlmProvider, ProfileId } from "./types";
+import { useEffect, useState } from "react";
+import { SettingsPage } from "./SettingsPage";
+import type { AppSettings, GenerateResponse, Issue, ProfileId } from "./types";
 
 const profiles: Array<{ id: ProfileId; label: string }> = [
+  { id: "default", label: "默认文稿模板" },
   { id: "general", label: "通用格式文档" },
   { id: "official", label: "公文" },
   { id: "meeting_minutes", label: "会议纪要" },
@@ -50,12 +52,16 @@ export function App() {
   const [outputPath, setOutputPath] = useState("");
   const [profile, setProfile] = useState<ProfileId>("general");
   const [formatInstruction, setFormatInstruction] = useState("");
-  const [llmProvider, setLlmProvider] = useState<LlmProvider>("local");
-  const [llmModel, setLlmModel] = useState("");
-  const [llmBaseUrl, setLlmBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [status, setStatus] = useState("等待选择文件");
+
+  const defaultSettings: AppSettings = { llmProvider: "local", llmModel: "", llmBaseUrl: "", apiKey: "" };
+  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(() => {
+    invoke<AppSettings>("load_settings").then(setSettings).catch(() => {});
+  }, []);
 
   async function handleSelectInput() {
     const selected = await open({
@@ -111,7 +117,13 @@ export function App() {
       }
 
       const result = await invoke<{ stdout: string }>("generate_docx", {
-        request: { inputPath, outputPath, profile, formatInstruction, llmProvider, llmModel, llmBaseUrl, apiKey },
+        request: {
+          inputPath, outputPath, profile, formatInstruction,
+          llmProvider: settings.llmProvider,
+          llmModel: settings.llmModel,
+          llmBaseUrl: settings.llmBaseUrl,
+          apiKey: settings.apiKey,
+        },
       });
       const payload = JSON.parse(result.stdout) as GenerateResponse;
       setIssues(payload.issues);
@@ -128,34 +140,13 @@ export function App() {
           <h1>DocForge</h1>
           <p>Markdown 转 docx，诊断格式问题，并执行安全修复。</p>
         </div>
-        <button className="iconButton" title="设置 API Key" type="button">
+        <button className="iconButton" title="AI 设置" type="button" onClick={() => setShowSettings(true)}>
           <Wrench size={18} />
         </button>
       </header>
 
       <section className="workspace">
         <aside className="panel">
-          <label>
-            API Key
-            <input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="OpenAI / Anthropic / 网关 API Key" />
-          </label>
-          <label>
-            解析方式
-            <select value={llmProvider} onChange={(event) => setLlmProvider(event.target.value as LlmProvider)}>
-              <option value="local">本地规则解析</option>
-              <option value="openai-responses">OpenAI Responses API</option>
-              <option value="openai-compatible">OpenAI-compatible Chat Completions</option>
-              <option value="anthropic-messages">Anthropic Messages API</option>
-            </select>
-          </label>
-          <label>
-            模型名称
-            <input value={llmModel} onChange={(event) => setLlmModel(event.target.value)} placeholder="gpt-4.1-mini" />
-          </label>
-          <label>
-            Base URL
-            <input value={llmBaseUrl} onChange={(event) => setLlmBaseUrl(event.target.value)} placeholder="https://api.example.com/v1" />
-          </label>
           <label>
             输入文件
             <div className="path-input">
@@ -210,6 +201,14 @@ export function App() {
           ))}
         </section>
       </section>
+
+      {showSettings && (
+        <SettingsPage
+          settings={settings}
+          onClose={() => setShowSettings(false)}
+          onSaved={(s) => { setSettings(s); setShowSettings(false); }}
+        />
+      )}
     </main>
   );
 }

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -143,10 +144,51 @@ fn repo_root() -> &'static Path {
         .expect("src-tauri should live under apps/desktop/src-tauri")
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppSettings {
+    llm_provider: String,
+    llm_model: String,
+    llm_base_url: String,
+    api_key: String,
+}
+
+fn settings_path() -> PathBuf {
+    dirs_next::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".docforge")
+        .join("settings.json")
+}
+
+#[tauri::command]
+fn load_settings() -> Result<AppSettings, String> {
+    let path = settings_path();
+    if !path.exists() {
+        return Ok(AppSettings {
+            llm_provider: "local".to_string(),
+            llm_model: String::new(),
+            llm_base_url: String::new(),
+            api_key: String::new(),
+        });
+    }
+    let data = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_settings(settings: AppSettings) -> Result<(), String> {
+    let path = settings_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let data = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    fs::write(&path, data).map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![generate_docx, validate_path])
+        .invoke_handler(tauri::generate_handler![generate_docx, validate_path, load_settings, save_settings])
         .run(tauri::generate_context!())
         .expect("failed to run tauri application");
 }

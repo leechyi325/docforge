@@ -1,4 +1,4 @@
-export type ProfileId = "general" | "official" | "meeting_minutes" | "briefing" | "speech";
+export type ProfileId = "default" | "general" | "official" | "meeting_minutes" | "briefing" | "speech";
 
 export type LlmProvider = "local" | "openai-responses" | "openai-compatible" | "anthropic-messages";
 
@@ -33,4 +33,11 @@ export type GenerateResponse = {
 export type PathValidation = {
   valid: boolean;
   error: string | null;
+};
+
+export type AppSettings = {
+  llmProvider: LlmProvider;
+  llmModel: string;
+  llmBaseUrl: string;
+  apiKey: string;
 };

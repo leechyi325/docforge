@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
-import sys
 from pathlib import Path
+
+from PyInstaller.utils.hooks import collect_data_files
 
 block_cipher = None
 
@@ -14,6 +15,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(spec_dir / 'profiles' / '*.yaml'), 'engine/profiles'),
+        *collect_data_files('docx'),
     ],
     hiddenimports=[
         'engine.llm.client',
@@ -35,7 +37,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(spec_dir / 'runtime_hook_docx.py')],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

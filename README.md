@@ -4,10 +4,11 @@ DocForge 文档格式智能整理桌面软件雏形。当前版本支持 Markdow
 
 ## Current Status
 
-- Code baseline through `d11fdf1` has been merged and pushed to `origin/main`.
-- Main handoff note: [docs/handoff-2026-05-27.md](docs/handoff-2026-05-27.md).
+- Current main includes desktop packaging with PyInstaller and bundled Pandoc sidecars.
+- Latest handoff note: [docs/handoff-2026-05-29.md](docs/handoff-2026-05-29.md).
 - Preferred CLI entry point: `format`, which accepts Markdown and `.docx` input.
-- Desktop processing requires the Tauri runtime. `npm run dev` is useful for UI-only work; use `npm run tauri dev` for real document processing.
+- Desktop processing requires the Tauri runtime. `npm run dev` is useful for UI-only work; use `npm run tauri dev` or a packaged app for real document processing.
+- macOS packaging has been verified locally and produces `apps/desktop/src-tauri/target/release/bundle/dmg/DocForge_0.1.0_aarch64.dmg`; Windows packaging scripts are present but must be run on Windows.
 
 ## Python Engine
 
@@ -42,7 +43,7 @@ Format an existing docx:
 ```bash
 .venv/bin/python -m engine.cli format \
   --input input.docx \
-  --profile official \
+  --profile general \
   --format-instruction "正文仿宋三号，行距28磅" \
   --llm-provider local \
   --output output.docx
@@ -84,11 +85,17 @@ cd apps/desktop
 npm install
 ```
 
+Build real sidecars before testing document processing in the desktop app:
+
+```bash
+scripts/fetch-pandoc.sh
+scripts/build-engine.sh
+```
+
 Run the desktop app during development:
 
 ```bash
 cd apps/desktop
-export DOCFORGE_PYTHON="$(pwd)/../../.venv/bin/python"
 npm run tauri dev
 ```
 
@@ -110,9 +117,25 @@ cd src-tauri
 cargo check
 ```
 
+## Packaging
+
+Build the macOS desktop package:
+
+```bash
+scripts/build-desktop.sh
+```
+
+Build the Windows desktop package on Windows:
+
+```powershell
+scripts\build-desktop.ps1
+```
+
+The packaged app bundles both the PyInstaller-built Python engine and Pandoc as Tauri sidecars. During local development, run `scripts/setup-dev.sh` (or `scripts\setup-dev.ps1` on Windows) if `cargo check` needs placeholder sidecar binaries.
+
 ## Notes
 
-- Pandoc must be available on `PATH` for Markdown to `.docx` conversion.
+- In source/dev CLI mode, Pandoc must be available on `PATH` for Markdown to `.docx` conversion. In packaged desktop mode, the Rust shell passes the bundled Pandoc sidecar path through `DOCFORGE_PANDOC`.
 - LLM provider adapters are isolated in `engine/llm`. Supported providers are `local`, `openai`/`openai-responses`, `openai-compatible`, and `anthropic-messages`.
 - Use `--llm-provider local` for deterministic development tests.
 - API keys entered in the desktop app are passed to the Python child process through environment variables, not command-line argv.

@@ -5,6 +5,25 @@ use std::path::PathBuf;
 use tauri::Emitter;
 use tauri_plugin_shell::ShellExt;
 
+fn sidecar_path(name: &str) -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let path = dir.join(name);
+    if path.exists() {
+        return Some(path);
+    }
+
+    #[cfg(windows)]
+    {
+        let exe_path = dir.join(format!("{name}.exe"));
+        if exe_path.exists() {
+            return Some(exe_path);
+        }
+    }
+
+    None
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GenerateRequest {
@@ -42,6 +61,10 @@ fn run_engine(
             "OPENAI_API_KEY"
         };
         envs.insert(env_key.to_string(), request.api_key.clone());
+    }
+
+    if let Some(pandoc_path) = sidecar_path("pandoc") {
+        envs.insert("DOCFORGE_PANDOC".to_string(), pandoc_path.to_string_lossy().to_string());
     }
 
     let (mut rx, _child) = app_handle

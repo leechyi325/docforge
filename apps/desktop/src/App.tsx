@@ -5,10 +5,10 @@ import { FileText, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LogPanel, type LogEntry } from "./LogPanel";
 import { SettingsPage } from "./SettingsPage";
-import type { AppSettings, GenerateResponse, Issue, ProfileId } from "./types";
+import type { AppSettings, GenerateResponse, Issue, ProfileId, StructureSummary } from "./types";
 
 const profiles: Array<{ id: ProfileId; label: string }> = [
-  { id: "default", label: "默认文稿模板" },
+  { id: "default", label: "AI 智能识别" },
   { id: "general", label: "通用格式文档" },
 ];
 
@@ -45,12 +45,32 @@ function getErrorMessage(error: unknown) {
   return "处理失败，请检查输入路径、Python 环境或模型配置。";
 }
 
+function formatStructureSummary(summary: StructureSummary | null) {
+  if (!summary) return "";
+  const labels: Array<[string, string]> = [
+    ["title", "标题"],
+    ["date", "日期"],
+    ["department", "部门"],
+    ["heading_1", "一级标题"],
+    ["heading_2", "二级标题"],
+    ["heading_3", "三级标题"],
+    ["table", "表格"],
+    ["unknown", "未识别段落"],
+  ];
+  const parts = labels
+    .map(([key, label]) => [label, summary[key]] as const)
+    .filter(([, count]) => typeof count === "number" && count > 0)
+    .map(([label, count]) => `${label} ${count} 个`);
+  return parts.length > 0 ? `AI 已识别：${parts.join("，")}。` : "";
+}
+
 export function App() {
   const [inputPath, setInputPath] = useState("");
   const [outputPath, setOutputPath] = useState("");
   const [profile, setProfile] = useState<ProfileId>("general");
   const [formatInstruction, setFormatInstruction] = useState("");
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [structureSummary, setStructureSummary] = useState<StructureSummary | null>(null);
   const [status, setStatus] = useState("等待选择文件");
 
   const defaultSettings: AppSettings = { llmProvider: "local", llmModel: "", llmBaseUrl: "", apiKey: "" };
@@ -137,6 +157,7 @@ export function App() {
     if (!(await validateBeforeGenerate())) return;
     setStatus(inputPath.trim().toLowerCase().endsWith(".docx") ? "正在整理 docx 格式" : "正在转换并整理 docx");
     setIssues([]);
+    setStructureSummary(null);
     setLogs([]);
     setProgress(0);
 
@@ -156,6 +177,7 @@ export function App() {
       });
       const payload = JSON.parse(result.stdout) as GenerateResponse;
       setIssues(payload.issues);
+      setStructureSummary(payload.structure_summary ?? null);
       setStatus(`已生成：${payload.output}`);
     } catch (error) {
       setStatus(`处理失败：${getErrorMessage(error)}`);
@@ -167,7 +189,7 @@ export function App() {
       <header className="topbar">
         <div>
           <h1>DocForge</h1>
-          <p>Markdown 转 docx，诊断格式问题，并执行安全修复。</p>
+          <p>Markdown / docx 智能整理，AI 可辅助识别结构，格式落地由本地引擎执行。</p>
         </div>
         <button className="iconButton" title="AI 设置" type="button" onClick={() => setShowSettings(true)}>
           <Wrench size={18} />
@@ -220,6 +242,7 @@ export function App() {
             <div className="progress-fill" style={{ width: `${progress * 100}%` }} />
           </div>
           <p>{status}</p>
+          {structureSummary && <p className="structure-summary">{formatStructureSummary(structureSummary)}</p>}
           <LogPanel logs={logs} expanded={logExpanded} onToggle={() => setLogExpanded(!logExpanded)} />
         </section>
 

@@ -225,3 +225,8 @@ button {
   color: #9ca3af;
   margin: 0;
 }
+
+.structure-summary {
+  color: #2563eb;
+  font-weight: 500;
+}

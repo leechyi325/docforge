@@ -14,6 +14,8 @@ export type Issue = {
   fix_action: unknown | null;
 };
 
+export type StructureSummary = Record<string, number>;
+
 export type GenerateRequest = {
   inputPath: string;
   outputPath: string;
@@ -28,6 +30,7 @@ export type GenerateRequest = {
 export type GenerateResponse = {
   output: string;
   issues: Issue[];
+  structure_summary?: StructureSummary;
 };
 
 export type PathValidation = {

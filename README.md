@@ -38,7 +38,30 @@ Generate a docx:
 
 `generate` remains the Markdown-compatible path. For general use, prefer `format`, which accepts Markdown and `.docx` input.
 
-Format an existing docx:
+AI intelligent recognition using the `default` profile requires a remote provider:
+
+```bash
+.venv/bin/python -m engine.cli format \
+  --input input.docx \
+  --profile default \
+  --llm-provider openai-compatible \
+  --llm-base-url https://api.example.com/v1 \
+  --llm-model deepseek-chat \
+  --api-key "$PROVIDER_API_KEY" \
+  --output output.docx
+```
+
+Use `general` for local deterministic formatting without LLM structure recognition:
+
+```bash
+.venv/bin/python -m engine.cli format \
+  --input input.docx \
+  --profile general \
+  --llm-provider local \
+  --output output.docx
+```
+
+Format an existing docx with format instruction:
 
 ```bash
 .venv/bin/python -m engine.cli format \

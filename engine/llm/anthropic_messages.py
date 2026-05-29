@@ -5,10 +5,11 @@ import urllib.error
 import urllib.request
 from typing import Callable, Dict, Optional, cast
 
-from engine.llm.base import parse_format_override_json
-from engine.llm.prompts import FORMAT_INSTRUCTION_PROMPT
+from engine.llm.base import parse_format_override_json, parse_recognized_structure_json
+from engine.llm.prompts import FORMAT_INSTRUCTION_PROMPT, STRUCTURE_RECOGNITION_PROMPT
 from engine.llm.settings import LlmSettings
 from engine.models import FormatOverride
+from engine.structure.models import RecognizedStructure, StructureInput
 
 
 Transport = Callable[[str, Dict[str, str], Dict[str, object]], Dict[str, object]]
@@ -52,6 +53,29 @@ class AnthropicMessagesClient:
         )
         raw_text = _extract_text_content(response)
         return parse_format_override_json(raw_text)
+
+    def recognize_structure(self, structure_input: StructureInput) -> RecognizedStructure:
+        response = self.transport(
+            f"{self.base_url}/v1/messages",
+            {
+                "content-type": "application/json",
+                "x-api-key": self.api_key,
+                "anthropic-version": ANTHROPIC_VERSION,
+            },
+            {
+                "model": self.model,
+                "max_tokens": 3000,
+                "system": STRUCTURE_RECOGNITION_PROMPT,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": json.dumps(structure_input.model_dump(), ensure_ascii=False),
+                    }
+                ],
+            },
+        )
+        raw_text = _extract_text_content(response)
+        return parse_recognized_structure_json(raw_text)
 
 
 def _extract_text_content(response: Dict[str, object]) -> str:

@@ -182,3 +182,132 @@ def test_cli_format_rejects_doc_input(tmp_path, capsys):
     assert exit_code == 1
     captured = capsys.readouterr()
     assert "Markdown and .docx" in captured.err
+
+
+from engine.structure.models import RecognizedParagraph, RecognizedStructure
+
+
+def test_cli_format_default_with_local_provider_fails(tmp_path, capsys):
+    input_docx = tmp_path / "input.docx"
+    output_docx = tmp_path / "output.docx"
+    doc = Document()
+    doc.add_paragraph("标题")
+    doc.save(input_docx)
+
+    exit_code = main([
+        "format",
+        "--input",
+        str(input_docx),
+        "--profile",
+        "default",
+        "--llm-provider",
+        "local",
+        "--output",
+        str(output_docx),
+    ])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "AI 智能识别需要配置远程模型" in captured.err
+
+
+def test_cli_format_default_outputs_structure_summary(monkeypatch, tmp_path, capsys):
+    input_docx = tmp_path / "input.docx"
+    output_docx = tmp_path / "output.docx"
+    doc = Document()
+    doc.add_paragraph("标题")
+    doc.add_paragraph("正文")
+    doc.save(input_docx)
+
+    class FakeClient:
+        def parse_format_instruction(self, instruction):
+            raise AssertionError("format instruction parser should not be called")
+
+        def recognize_structure(self, structure_input):
+            return RecognizedStructure(
+                paragraphs=[
+                    RecognizedParagraph(index=0, role="title", confidence=0.9, reason="title"),
+                    RecognizedParagraph(index=1, role="body", confidence=0.8, reason="body"),
+                ],
+                tables=[],
+            )
+
+    monkeypatch.setattr(engine.cli, "create_llm_client", lambda settings: FakeClient())
+
+    exit_code = main([
+        "format",
+        "--input",
+        str(input_docx),
+        "--profile",
+        "default",
+        "--llm-provider",
+        "openai-compatible",
+        "--llm-model",
+        "fake-model",
+        "--api-key",
+        "fake-key",
+        "--output",
+        str(output_docx),
+    ])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["structure_summary"]["title"] == 1
+    assert payload["structure_summary"]["body"] == 1
+
+
+def test_cli_format_default_with_instruction_reuses_one_client(monkeypatch, tmp_path, capsys):
+    input_docx = tmp_path / "input.docx"
+    output_docx = tmp_path / "output.docx"
+    doc = Document()
+    doc.add_paragraph("标题")
+    doc.add_paragraph("正文")
+    doc.save(input_docx)
+    calls = []
+    events = []
+
+    class FakeClient:
+        def parse_format_instruction(self, instruction):
+            events.append(("parse", instruction))
+            return None
+
+        def recognize_structure(self, structure_input):
+            events.append(("recognize", len(structure_input.paragraphs)))
+            return RecognizedStructure(
+                paragraphs=[
+                    RecognizedParagraph(index=0, role="title", confidence=0.9, reason="title"),
+                    RecognizedParagraph(index=1, role="body", confidence=0.8, reason="body"),
+                ],
+                tables=[],
+            )
+
+    def fake_create_llm_client(settings):
+        calls.append(settings)
+        return FakeClient()
+
+    monkeypatch.setattr(engine.cli, "create_llm_client", fake_create_llm_client)
+
+    exit_code = main([
+        "format",
+        "--input",
+        str(input_docx),
+        "--profile",
+        "default",
+        "--format-instruction",
+        "正文仿宋三号",
+        "--llm-provider",
+        "openai-compatible",
+        "--llm-model",
+        "fake-model",
+        "--api-key",
+        "fake-key",
+        "--output",
+        str(output_docx),
+    ])
+
+    assert exit_code == 0
+    assert len(calls) == 1
+    assert events == [("parse", "正文仿宋三号"), ("recognize", 2)]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["structure_summary"]["title"] == 1
+    assert payload["structure_summary"]["body"] == 1

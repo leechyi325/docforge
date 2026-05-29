@@ -62,18 +62,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.command in {"generate", "format"}:
         try:
             profile = load_profile(args.profile)
-            override = _parse_format_override(args)
-            result = format_document(Path(args.input), Path(args.output), profile, override)
+            settings = _build_llm_settings(args)
+            llm_client = create_llm_client(settings) if args.format_instruction or profile.id == "default" else None
+            override = _parse_format_override(args, llm_client)
+            result = format_document(
+                Path(args.input),
+                Path(args.output),
+                profile,
+                override,
+                llm_client=llm_client if profile.id == "default" else None,
+            )
         except Exception as exc:
             print(str(exc), file=sys.stderr)
             return 1
 
-        print(
-            json.dumps(
-                {"output": str(result.output_path), "issues": [issue.model_dump() for issue in result.issues]},
-                ensure_ascii=False,
-            )
-        )
+        payload = {"output": str(result.output_path), "issues": [issue.model_dump() for issue in result.issues]}
+        if result.structure_summary is not None:
+            payload["structure_summary"] = result.structure_summary.counts
+        print(json.dumps(payload, ensure_ascii=False))
         return 0
 
     if args.command == "diagnose":
@@ -91,17 +97,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     return 2
 
 
-def _parse_format_override(args: argparse.Namespace):
-    if not args.format_instruction:
-        return None
-
-    settings = LlmSettings(
+def _build_llm_settings(args: argparse.Namespace) -> LlmSettings:
+    return LlmSettings(
         provider=args.llm_provider,
         api_key=args.api_key,
         model=args.llm_model,
         base_url=args.llm_base_url,
     )
-    return create_llm_client(settings).parse_format_instruction(args.format_instruction)
+
+
+def _parse_format_override(args: argparse.Namespace, llm_client):
+    if not args.format_instruction:
+        return None
+
+    return llm_client.parse_format_instruction(args.format_instruction)
 
 
 if __name__ == "__main__":

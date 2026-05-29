@@ -9,6 +9,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 from engine.models import FormatOverride, PageSetup, ParagraphStyle, Profile
+from engine.structure.models import RecognizedStructure
 from engine.style_utils import chinese_size_to_pt, merge_style, parse_length_to_pt
 
 ALIGNMENT = {
@@ -24,6 +25,7 @@ def apply_profile_formatting(
     output_docx: Path,
     profile: Profile,
     override: Optional[FormatOverride] = None,
+    structure: Optional[RecognizedStructure] = None,
 ) -> Path:
     document = Document(input_docx)
     page = override.page if override and override.page else profile.page
@@ -35,22 +37,33 @@ def apply_profile_formatting(
     body_style = merge_style(profile.body, override.body if override else None)
     heading_overrides = override.headings if override else {}
 
-    for index, paragraph in enumerate(document.paragraphs):
-        if index == 0:
-            _apply_paragraph_style(paragraph, title_style)
-        elif profile.date_field and index == 1:
-            _apply_paragraph_style(paragraph, profile.date_field)
-        elif profile.department_field and index == 2:
-            _apply_paragraph_style(paragraph, profile.department_field)
-        else:
-            heading_key = _detect_heading_key(paragraph.text)
-            if heading_key:
-                base = profile.headings.get(heading_key, body_style)
-                _apply_paragraph_style(paragraph, merge_style(base, heading_overrides.get(heading_key)))
+    if structure:
+        role_by_index = {p.index: p.role for p in structure.paragraphs}
+        for index, paragraph in enumerate(document.paragraphs):
+            role = role_by_index.get(index, "body")
+            style = _get_style_for_role(role, profile, title_style, body_style, heading_overrides)
+            _apply_paragraph_style(paragraph, style)
+            if role in ("body", "unknown") and profile.content_bold:
+                _apply_content_bold(paragraph, profile.content_bold)
+    else:
+        for index, paragraph in enumerate(document.paragraphs):
+            if index == 0:
+                _apply_paragraph_style(paragraph, title_style)
+            elif profile.date_field and index == 1:
+                _apply_paragraph_style(paragraph, profile.date_field)
+            elif profile.department_field and index == 2:
+                _apply_paragraph_style(paragraph, profile.department_field)
             else:
-                _apply_paragraph_style(paragraph, body_style)
-                if profile.content_bold:
-                    _apply_content_bold(paragraph, profile.content_bold)
+                heading_key = _detect_heading_key(paragraph.text)
+                if heading_key:
+                    base = profile.headings.get(heading_key, body_style)
+                    _apply_paragraph_style(paragraph, merge_style(base, heading_overrides.get(heading_key)))
+                else:
+                    _apply_paragraph_style(paragraph, body_style)
+                    if profile.content_bold:
+                        _apply_content_bold(paragraph, profile.content_bold)
+
+    _apply_table_formatting(document, body_style)
 
     output_docx.parent.mkdir(parents=True, exist_ok=True)
     document.save(output_docx)
@@ -63,6 +76,35 @@ def _apply_page_setup(document: Document, page: PageSetup) -> None:
         section.bottom_margin = Cm(parse_length_to_pt(page.margin_bottom) / 28.3464567)
         section.left_margin = Cm(parse_length_to_pt(page.margin_left) / 28.3464567)
         section.right_margin = Cm(parse_length_to_pt(page.margin_right) / 28.3464567)
+
+
+def _get_style_for_role(
+    role: str,
+    profile: Profile,
+    title_style: ParagraphStyle,
+    body_style: ParagraphStyle,
+    heading_overrides: dict,
+) -> ParagraphStyle:
+    if role == "title":
+        return title_style
+    if role == "date" and profile.date_field:
+        return profile.date_field
+    if role == "department" and profile.department_field:
+        return profile.department_field
+    if role in ("heading_1", "heading_2", "heading_3"):
+        base = profile.headings.get(role, body_style)
+        return merge_style(base, heading_overrides.get(role))
+    if role in profile.special_sections:
+        return profile.special_sections[role]
+    return body_style
+
+
+def _apply_table_formatting(document: Document, body_style: ParagraphStyle) -> None:
+    for table in document.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    _apply_paragraph_style(paragraph, body_style)
 
 
 def _apply_paragraph_style(paragraph, style: ParagraphStyle) -> None:

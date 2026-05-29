@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from engine.llm.base import LlmClient
 from engine.llm.settings import LlmSettings
 from engine.models import FormatOverride, ParagraphStyle
+from engine.structure.models import RecognizedStructure, StructureInput
 
 
 class OpenAIClient:
@@ -18,6 +19,9 @@ class OpenAIClient:
 
     def parse_format_instruction(self, instruction: str) -> FormatOverride:
         return self._client.parse_format_instruction(instruction)
+
+    def recognize_structure(self, structure_input: StructureInput) -> RecognizedStructure:
+        return self._client.recognize_structure(structure_input)
 
 
 def parse_format_instruction_locally(instruction: str) -> FormatOverride:
@@ -66,6 +70,11 @@ def parse_format_instruction_locally(instruction: str) -> FormatOverride:
 class LocalLlmClient:
     def parse_format_instruction(self, instruction: str) -> FormatOverride:
         return parse_format_instruction_locally(instruction)
+
+    def recognize_structure(self, structure_input: StructureInput) -> RecognizedStructure:
+        raise ValueError(
+            "AI 智能识别需要配置远程模型。请在 AI 设置中配置 API Key 和模型，或改用“通用格式文档”。"
+        )
 
 
 def create_llm_client(settings: LlmSettings) -> LlmClient:

@@ -2,6 +2,7 @@ import pytest
 import openai
 
 from engine.llm.anthropic_messages import AnthropicMessagesClient
+from engine.llm.client import OpenAIClient
 from engine.llm.openai_responses import OpenAIResponsesClient
 from engine.llm.openai_compatible import OpenAICompatibleClient
 from engine.llm.settings import LlmSettings
@@ -239,3 +240,134 @@ def test_anthropic_messages_adapter_rejects_missing_text_content():
 
     with pytest.raises(ValueError, match="text content"):
         client.parse_format_instruction("标题居中")
+
+
+from engine.structure.models import StructureInput, ParagraphCandidate, TableCandidate
+
+
+def _structure_input():
+    return StructureInput(
+        source_path="source.docx",
+        paragraphs=[
+            ParagraphCandidate(index=0, text="标题", char_count=2),
+            ParagraphCandidate(index=1, text="正文", char_count=2),
+        ],
+        tables=[TableCandidate(index=0, rows=2, columns=2, sample_cells=[["序号", "事项"]])],
+    )
+
+
+def test_openai_client_recognize_structure_delegates_to_responses_client(monkeypatch):
+    calls = []
+
+    class FakeOpenAIResponsesClient:
+        def __init__(self, settings):
+            calls.append(("init", settings))
+
+        def recognize_structure(self, structure_input):
+            calls.append(("recognize_structure", structure_input))
+            return "recognized"
+
+    monkeypatch.setattr("engine.llm.openai_responses.OpenAIResponsesClient", FakeOpenAIResponsesClient)
+
+    structure_input = _structure_input()
+    client = OpenAIClient(api_key="test", model="gpt-test")
+
+    assert client.recognize_structure(structure_input) == "recognized"
+    assert calls[0][0] == "init"
+    assert calls[0][1].provider == "openai-responses"
+    assert calls[0][1].api_key == "test"
+    assert calls[0][1].model == "gpt-test"
+    assert calls[1] == ("recognize_structure", structure_input)
+
+
+def test_openai_responses_adapter_recognizes_structure_with_json_schema():
+    class FakeStructureResponses:
+        def __init__(self):
+            self.kwargs = None
+
+        def create(self, **kwargs):
+            self.kwargs = kwargs
+            return type(
+                "FakeResponse",
+                (),
+                {
+                    "output_text": '{"paragraphs":[{"index":0,"role":"title","confidence":0.9,"reason":"first paragraph"}],"tables":[{"index":0,"role":"data_table","confidence":0.8,"reason":"table"}],"notes":[]}'
+                },
+            )()
+
+    class FakeClient:
+        def __init__(self):
+            self.responses = FakeStructureResponses()
+
+    fake_client = FakeClient()
+    client = OpenAIResponsesClient(
+        LlmSettings(provider="openai-responses", api_key="test", model="gpt-test"),
+        client=fake_client,
+    )
+
+    recognized = client.recognize_structure(_structure_input())
+
+    assert recognized.paragraphs[0].role == "title"
+    assert fake_client.responses.kwargs["text"]["format"]["name"] == "recognized_structure"
+
+
+def test_openai_compatible_adapter_recognizes_structure_with_chat_completions():
+    class FakeStructureChatCompletions:
+        def __init__(self):
+            self.calls = []
+
+        def create(self, **kwargs):
+            self.calls.append(kwargs)
+            message = type(
+                "FakeMessage",
+                (),
+                {
+                    "content": '{"paragraphs":[{"index":0,"role":"title","confidence":0.9,"reason":"first paragraph"}],"tables":[],"notes":[]}'
+                },
+            )()
+            choice = type("FakeChoice", (), {"message": message})()
+            return type("FakeCompletion", (), {"choices": [choice]})()
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeStructureChatCompletions()
+
+    class FakeClient:
+        def __init__(self):
+            self.chat = FakeChat()
+
+    fake_client = FakeClient()
+    client = OpenAICompatibleClient(
+        LlmSettings(provider="openai-compatible", api_key="test", model="deepseek-chat"),
+        client=fake_client,
+    )
+
+    recognized = client.recognize_structure(_structure_input())
+
+    assert recognized.paragraphs[0].role == "title"
+    assert fake_client.chat.completions.calls[0]["response_format"]["type"] == "json_schema"
+
+
+def test_anthropic_messages_adapter_recognizes_structure():
+    calls = []
+
+    def fake_transport(url, headers, payload):
+        calls.append((url, headers, payload))
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": '{"paragraphs":[{"index":0,"role":"title","confidence":0.9,"reason":"first paragraph"}],"tables":[],"notes":[]}',
+                }
+            ]
+        }
+
+    client = AnthropicMessagesClient(
+        LlmSettings(provider="anthropic-messages", api_key="test", model="claude-test"),
+        transport=fake_transport,
+    )
+
+    recognized = client.recognize_structure(_structure_input())
+
+    assert recognized.paragraphs[0].role == "title"
+    assert "document structure recognizer" in calls[0][2]["system"]

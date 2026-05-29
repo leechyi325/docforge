@@ -64,3 +64,13 @@ def test_parse_format_override_json_extracts_embedded_object():
 
     assert override.body.font == "仿宋"
     assert override.body.line_spacing == "28pt"
+
+
+from engine.structure.models import StructureInput
+
+
+def test_local_client_does_not_support_structure_recognition():
+    client = create_llm_client(LlmSettings(provider="local"))
+
+    with pytest.raises(ValueError, match="AI 智能识别需要配置远程模型"):
+        client.recognize_structure(StructureInput(source_path="x.docx", paragraphs=[], tables=[]))

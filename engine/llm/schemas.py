@@ -78,6 +78,66 @@ DOCUMENT_STRUCTURE_SCHEMA = {
     "required": ["document_type", "title", "headings", "required_fields_present"],
 }
 
+STRUCTURE_RECOGNITION_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "paragraphs": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "index": {"type": "integer"},
+                    "role": {
+                        "enum": [
+                            "title",
+                            "date",
+                            "department",
+                            "heading_1",
+                            "heading_2",
+                            "heading_3",
+                            "body",
+                            "table_caption",
+                            "table_note",
+                            "attachment",
+                            "signature",
+                            "unknown",
+                        ]
+                    },
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    "reason": {"type": "string"},
+                },
+                "required": ["index", "role", "confidence", "reason"],
+            },
+        },
+        "tables": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "index": {"type": "integer"},
+                    "role": {
+                        "enum": [
+                            "data_table",
+                            "schedule_table",
+                            "signature_table",
+                            "appendix_table",
+                            "unknown",
+                        ]
+                    },
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    "reason": {"type": "string"},
+                },
+                "required": ["index", "role", "confidence", "reason"],
+            },
+        },
+        "notes": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["paragraphs", "tables", "notes"],
+}
+
 ISSUE_LIST_SCHEMA = {
     "type": "object",
     "additionalProperties": False,

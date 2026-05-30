@@ -142,3 +142,21 @@ def test_apply_profile_formatting_styles_table_cell_text(tmp_path):
     run = result.tables[0].cell(1, 1).paragraphs[0].runs[0]
     assert run.font.name == "仿宋_GB2312"
     assert run.font.color.rgb == RGBColor(0, 0, 0)
+
+
+def test_apply_profile_formatting_clears_italic_and_underline(tmp_path):
+    source = tmp_path / "source.docx"
+    output = tmp_path / "output.docx"
+    doc = Document()
+    p = doc.add_paragraph("测试标题")
+    p.runs[0].font.italic = True
+    p.runs[0].font.underline = True
+    doc.add_paragraph("正文段落")
+    doc.save(source)
+
+    apply_profile_formatting(source, output, load_profile("general"))
+
+    result = Document(output)
+    assert result.paragraphs[0].runs[0].font.italic is False
+    assert result.paragraphs[0].runs[0].font.underline is False
+    assert result.paragraphs[1].runs[0].font.italic is False

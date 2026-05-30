@@ -128,6 +128,8 @@ def _apply_paragraph_style(paragraph, style: ParagraphStyle) -> None:
             run.font.size = Pt(chinese_size_to_pt(style.size))
         if style.bold is not None:
             run.font.bold = style.bold
+        run.font.italic = False
+        run.font.underline = False
         run.font.color.rgb = RGBColor(0, 0, 0)
 
 
